@@ -1,7 +1,20 @@
 #include "io.h"
 
+void serial_init(void) {
+    outb(0x3f8 + 1, 0x00);    // Disable all interrupts
+    outb(0x3f8 + 3, 0x80);    // Enable DLAB (set baud rate divisor)
+    outb(0x3f8 + 0, 0x03);    // Set divisor to 3 (38400 baud)
+    outb(0x3f8 + 1, 0x00);    //                  (hi byte)
+    outb(0x3f8 + 3, 0x03);    // 8 bits, no parity, one stop bit
+    outb(0x3f8 + 2, 0xC7);    // Enable FIFO, clear them, with 14-byte threshold
+    outb(0x3f8 + 4, 0x0B);    // IRQs enabled, RTS/DSR set
+}
+
 void serial_write(const char* s) {
     while (*s) {
+        // Wait for the transmitter to be empty with a timeout
+        int timeout = 10000;
+        while (((inb(0x3f8 + 5) & 0x20) == 0) && --timeout > 0);
         outb(0x3f8, *s++);
     }
 }
@@ -32,17 +45,21 @@ void serial_printf(const char* fmt, ...) {
             serial_write(buf);
             fmt += 2;
         } else if (*fmt == '%' && *(fmt + 1) == 'd') {
-            // Very simple %d
             int d = va_arg(args, int);
             if (d == 0) {
                 serial_write("0");
             } else {
+                if (d < 0) {
+                    serial_write("-");
+                    d = -d;
+                }
                 char buf[12];
                 int i = 10;
                 buf[11] = '\0';
-                while (d > 0) {
-                    buf[i--] = (d % 10) + '0';
-                    d /= 10;
+                uint32_t val = (uint32_t)d;
+                while (val > 0) {
+                    buf[i--] = (val % 10) + '0';
+                    val /= 10;
                 }
                 serial_write(&buf[i+1]);
             }

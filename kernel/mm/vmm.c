@@ -5,6 +5,7 @@
 #define PAGE_ENTRIES 512
 
 static uint64_t current_pml4_phys;
+static uint64_t kernel_pml4_phys;
 
 static uint64_t get_index(uint64_t virt, int level) {
     switch (level) {
@@ -24,7 +25,13 @@ static inline uint64_t get_cr3() {
 
 void vmm_init(void) {
     asm volatile("mov %%cr3, %0" : "=r"(current_pml4_phys));
+    kernel_pml4_phys = current_pml4_phys;
     serial_printf("VMM: Initialized with PML4 at %p\n", current_pml4_phys);
+
+    // Identity map first 512MB to cover most RAM and I/O regions
+    for (uint64_t i = 0; i < 512 * 1024 * 1024; i += PAGE_SIZE) {
+        vmm_map(i, i, PTE_PRESENT | PTE_WRITABLE);
+    }
 }
 
 uint64_t vmm_get_current_pml4(void) {
@@ -46,11 +53,9 @@ uint64_t vmm_create_address_space(void) {
     }
 
     // Clone the kernel part of the address space.
-    // In our identity map, we'll just copy the first 256 entries for now.
-    // This is a simplification.
-    uint64_t* current_v = (uint64_t*)current_pml4_phys;
-    for (int i = 0; i < 256; i++) {
-        new_pml4[i] = current_v[i];
+    uint64_t* kernel_v = (uint64_t*)kernel_pml4_phys;
+    for (int i = 0; i < 512; i++) {
+        new_pml4[i] = kernel_v[i];
     }
 
     return (uint64_t)new_pml4;
@@ -79,6 +84,14 @@ void vmm_map(uint64_t virt, uint64_t phys, uint64_t flags) {
             
             table[index] = next_table_phys | table_flags;
         } else {
+            // Check if this is a huge page (bit 7)
+            if (table[index] & (1 << 7)) {
+                // If it's already a huge page, we can't easily map 4KB pages inside it
+                // without splitting it. For now, let's just return if the mapping
+                // is redundant.
+                return;
+            }
+
             // Propagate USER flag to parent tables if necessary
             if (flags & PTE_USER) {
                 table[index] |= PTE_USER;

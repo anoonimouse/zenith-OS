@@ -1,4 +1,5 @@
 #include "syscall.h"
+#include "task.h"
 #include "../hal/io.h"
 
 extern void syscall_entry(void);
@@ -40,6 +41,19 @@ void sys_write(struct syscall_regs* regs) {
     serial_write((const char*)regs->rsi);
     regs->rax = regs->rdx;
 }
+ 
+void sys_yield(struct syscall_regs* regs) {
+    (void)regs;
+    task_yield();
+}
+
+void sys_getpid(struct syscall_regs* regs) {
+    regs->rax = task_get_current_id();
+}
+
+void sys_print_hex(struct syscall_regs* regs) {
+    serial_printf("%p\n", regs->rdi);
+}
 
 void sys_exit(struct syscall_regs* regs) {
     serial_printf("Task exiting with code %d\n", regs->rdi);
@@ -51,8 +65,11 @@ void sys_exit(struct syscall_regs* regs) {
 }
 
 static syscall_handler_t syscall_table[] = {
-    [SYS_WRITE] = sys_write,
-    [SYS_EXIT]  = sys_exit,
+    [SYS_WRITE]     = sys_write,
+    [SYS_PRINT_HEX] = sys_print_hex,
+    [SYS_YIELD]     = sys_yield,
+    [SYS_GETPID]    = sys_getpid,
+    [SYS_EXIT]      = sys_exit,
 };
 
 #define MAX_SYSCALL (sizeof(syscall_table) / sizeof(syscall_handler_t))

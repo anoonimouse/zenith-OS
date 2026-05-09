@@ -5,11 +5,18 @@ static struct tss kernel_tss;
 static uint8_t gdt_data[5 * 8 + 16];
 static struct gdt_ptr gdt_ptr;
 
+static struct cpu_context current_cpu_context __attribute__((aligned(16)));
+
 // Safe stack for double faults
-static uint8_t double_fault_stack[4096];
+static uint8_t double_fault_stack[4096] __attribute__((aligned(16)));
+// Dedicated stack for task switching/scheduling to ensure consistent frame
+static uint8_t task_switch_stack[4096] __attribute__((aligned(16)));
 
 extern void gdt_load(struct gdt_ptr* ptr);
 extern void tss_load();
+
+#define MSR_GS_BASE 0xC0000101
+#define MSR_KERNEL_GS_BASE 0xC0000102
 
 void gdt_init() {
     struct gdt_entry* gdt = (struct gdt_entry*)gdt_data;
@@ -55,6 +62,8 @@ void gdt_init() {
     
     // IST1 for Double Fault
     kernel_tss.ist1 = (uint64_t)&double_fault_stack[4096];
+    // IST2 for Task Switching/Scheduling
+    kernel_tss.ist2 = (uint64_t)&task_switch_stack[4096];
     kernel_tss.iopb_offset = sizeof(struct tss);
 
     // Initialize GDT pointer
@@ -67,9 +76,14 @@ void gdt_init() {
     // Load TSS
     tss_load();
 
-    serial_printf("GDT: Initialized with TSS at %p\n", &kernel_tss);
+    // Setup GS_BASE and KERNEL_GS_BASE for syscall stack switching
+    wrmsr(MSR_GS_BASE, (uint64_t)&current_cpu_context);
+    wrmsr(MSR_KERNEL_GS_BASE, (uint64_t)&current_cpu_context);
+
+    serial_printf("GDT: Initialized with TSS at %p and GS_BASE at %p\n", &kernel_tss, &current_cpu_context);
 }
 
 void gdt_set_kernel_stack(uint64_t stack) {
     kernel_tss.rsp0 = stack;
+    current_cpu_context.kernel_stack = stack;
 }

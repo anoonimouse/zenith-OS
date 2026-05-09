@@ -59,6 +59,7 @@ struct multiboot1_mmap_entry {
 } __attribute__((packed));
 
 void kmain(uint64_t multiboot_info_addr, uint64_t magic) {
+    serial_init();
     serial_write("TinyOS Kernel Started\n");
 
     // VGA text buffer starts at 0xB8000
@@ -114,10 +115,14 @@ void kmain(uint64_t multiboot_info_addr, uint64_t magic) {
 
         for (uint32_t i = 0; i < mmap_len; ) {
             struct multiboot1_mmap_entry* entry = (struct multiboot1_mmap_entry*)((uint8_t*)mmap + i);
-            uint64_t end = entry->addr + entry->len;
-            if (end > total_mem) total_mem = end;
+            if (entry->type == 1) { // Available RAM
+                uint64_t end = entry->addr + entry->len;
+                if (end > total_mem) total_mem = end;
+            }
             i += entry->size + 4;
         }
+        // Cap at 4GB for safety in this early microkernel
+        if (total_mem > 0x100000000ULL) total_mem = 0x100000000ULL;
 
         bitmap_addr = ((uint64_t)__kernel_end + 4095) & ~4095;
         pmm_init(total_mem, bitmap_addr);
@@ -135,10 +140,17 @@ void kmain(uint64_t multiboot_info_addr, uint64_t magic) {
         while(1) asm volatile("hlt");
     }
 
+    serial_printf("Main: Kernel End at %p, Total Mem: %x bytes\n", __kernel_end, total_mem);
+
     // Common reservations
     pmm_mark_reserved(0, 0x100000); // 1MB reserved
     pmm_mark_reserved(0x100000, (uint64_t)__kernel_end - 0x100000);
-    pmm_mark_reserved(bitmap_addr, (total_mem / PAGE_SIZE) / 8);
+    
+    // Reserve the PMM bitmap itself
+    uint64_t pmm_bitmap_size = (total_mem / PAGE_SIZE + 7) / 8;
+    pmm_mark_reserved(bitmap_addr, pmm_bitmap_size);
+    
+    serial_printf("Main: PMM Reserved %d KB for bitmap at %p\n", pmm_bitmap_size / 1024, bitmap_addr);
 
     // Initialize Heap
     heap_init();
@@ -154,19 +166,24 @@ void kmain(uint64_t multiboot_info_addr, uint64_t magic) {
     lapic_init();
     idt_init();
     pic_init();
-    apic_timer_init(100);
+    serial_printf("Main: APIC Timer Initializing...\n");
+    apic_timer_init(10000000);
+    serial_printf("Main: Keyboard Initializing...\n");
     keyboard_init();
+    serial_printf("Main: Syscall Initializing...\n");
     syscall_init();
 
     // Initialize Scheduler
+    serial_printf("Main: Scheduler Initializing...\n");
     task_init();
 
-    serial_printf("Main: Creating user task...\n");
-    struct task* utask = task_create_user(0x40000000, 0x40100000);
-    task_load_user_program(utask, user_program_start, user_program_end);
+    serial_printf("Main: Creating user tasks...\n");
+    struct task* t1 = task_create_user(0x0000008000000000, 0x0000008000100000);
+    task_load_user_program(t1, user_program_start, user_program_end);
 
-    serial_printf("Diagnostic: Checking user mapping...\n");
-    vmm_dump_entry(0x40000000);
+    struct task* t2 = task_create_user(0x0000008000000000, 0x0000008000100000);
+    task_load_user_program(t2, user_program_start, user_program_end);
+
     
     serial_printf("Main: Starting multitasking...\n");
     asm volatile("sti");

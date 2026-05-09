@@ -5,16 +5,10 @@
 #include "../mm/vmm.h"
 #include "../proc/task.h"
 
-struct interrupt_frame {
-    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
-    uint64_t rdi, rsi, rbp, rdx, rcx, rbx, rax;
-    uint64_t vector, error_code;
-    uint64_t rip, cs, rflags, rsp, ss;
-};
 
 static uint64_t timer_ticks = 0;
 
-void interrupt_handler(struct interrupt_frame* frame) {
+uint64_t interrupt_handler(struct interrupt_frame* frame) {
     if (frame->vector < 32) {
         serial_printf("CPU EXCEPTION %d (Error Code: %p) at RIP: %p\n", 
                       frame->vector, frame->error_code, frame->rip);
@@ -37,7 +31,7 @@ void interrupt_handler(struct interrupt_frame* frame) {
         while (1) { asm volatile("hlt"); }
     } else if (frame->vector >= 32 && frame->vector < 48) {
         // IRQ
-        // Send EOI (End of Interrupt) to PIC before yielding
+        // Send EOI (End of Interrupt) to PIC
         if (frame->vector >= 40) {
             outb(0xA0, 0x20); // Send to slave PIC
         }
@@ -45,17 +39,21 @@ void interrupt_handler(struct interrupt_frame* frame) {
 
         if (frame->vector == 32) {
             timer_ticks++;
-            // Timer interrupt - use for preemption
-            task_yield();
+            lapic_eoi();
+            return scheduler_schedule(frame);
         } else if (frame->vector == 33) {
             keyboard_handler();
+            lapic_eoi();
+        } else {
+            lapic_eoi();
         }
-
-        // Send EOI to LAPIC
-        lapic_eoi();
+    } else if (frame->vector == 129) {
+        return scheduler_schedule(frame);
     } else {
         serial_printf("UNKNOWN INTERRUPT %d\n", frame->vector);
     }
+
+    return (uint64_t)frame;
 }
 
 // Function to initialize PIC

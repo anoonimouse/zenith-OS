@@ -1,0 +1,28 @@
+TinyOS Kernel Started
+PMM Initialized with bitmap.
+Main: Kernel End at 0x000000000010F240, Total Mem: 7FE0000 bytes
+Main: PMM Reserved 3 KB for bitmap at 0x0000000000110000
+Heap: Initialized with 128KB at 0x0000000000111000
+VMM: Initialized with PML4 at 0x0000000000105000
+GDT: Initialized with TSS at 0x000000000010D098 and GS_BASE at 0x000000000010F110
+APIC: Local APIC base at 0x00000000FEE00000
+APIC: Local APIC enabled.
+IDT: Initialized and loaded at 0x000000000010C030
+PIC: Initialized and remapped IRQs to 32-47
+Main: APIC Timer Initializing...
+Main: Keyboard Initializing...
+Keyboard: Initialized
+Main: Syscall Initializing...
+Syscall: Initialized at 0x0000000000100310
+Main: Scheduler Initializing...
+Scheduler: Initialized (Main Task ID: 0)
+Main: Creating user tasks...
+Main: Starting multitasking...
+Scheduler: Task 2 jumping to Ring 3 at 0x0000008000000000...
+0x0000000000000002
+Ring 3: Task active and running
+Scheduler: Task 1 jumping to Ring 3 at 0x0000008000000000...
+0x0000000000000001
+Ring 3: Task active and running
+CPU EXCEPTION 6 (Error Code: 0x0000000000000000) at RIP: 0x0000000000000003
+  CS: 0x0000000000000008  SS: 0x0000000000000010  RSP: 0x000000000013EF58  RFLAGS: 0x0000000000010086

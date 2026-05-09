@@ -1,0 +1,27 @@
+# Compiled Object files
+*.o
+*.obj
+
+# Binaries and ISOs
+*.bin
+*.iso
+*.img
+
+# Build directories
+build/
+
+# Python Virtual Environment
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db

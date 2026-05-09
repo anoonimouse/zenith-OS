@@ -25,6 +25,7 @@ static inline void wrmsr(uint32_t msr, uint64_t value) {
     asm volatile("wrmsr" : : "a"(low), "d"(high), "c"(msr));
 }
 
+void serial_init(void);
 void serial_write(const char* s);
 void uint64_to_hex(uint64_t n, char* buf);
 void serial_printf(const char* fmt, ...);

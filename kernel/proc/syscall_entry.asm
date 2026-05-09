@@ -1,18 +1,28 @@
 [bits 64]
 
 extern syscall_dispatcher
+
+section .text
 global syscall_entry
 
 syscall_entry:
     ; syscall saves RIP in RCX and RFLAGS in R11
     ; It also switches CS/SS based on STAR MSR
 
-    ; For now, we are in Ring 0, so we use the same stack.
-    ; In a real OS, we would swapgs and switch to a kernel stack.
-
-    ; Save registers (similar to interrupt frame, but RCX and R11 are already used by syscall)
+    ; At this point:
+    ; RCX = return RIP
+    ; R11 = saved RFLAGS
+    ; RSP = User RSP
+    
+    ; Switch to kernel stack using GS_BASE context
+    swapgs
+    mov [gs:8], rsp      ; Save user RSP in cpu_context.user_stack_temp
+    mov rsp, [gs:0]      ; Load kernel RSP from cpu_context.kernel_stack
+    
+    ; Push user state for syscall_regs
     push r11 ; saved rflags
     push rcx ; saved rip
+    push qword [gs:8] ; user rsp
     
     push rax
     push rbx
@@ -28,35 +38,7 @@ syscall_entry:
     push r14
     push r15
 
-    ; Set up arguments for syscall_dispatcher(num, arg1, arg2, arg3, arg4, arg5)
-    ; In x64 ABI: rdi, rsi, rdx, rcx, r8, r9
-    ; Syscall convention (Linux-like): rax=num, rdi, rsi, rdx, r10, r8, r9
-    
-    mov r9, r9
-    mov r8, r8
-    mov rcx, r10 ; syscall uses r10 instead of rcx for 4th arg because rcx is used for rip
-    mov rdx, rdx
-    mov rsi, rsi
-    mov rdi, rdi
-    mov rax, rax ; syscall number
-
-    ; Note: we need to pass rax as the first argument to our C dispatcher
-    ; Let's adjust the calling convention for our dispatcher:
-    ; void syscall_dispatcher(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5)
-    
-    ; Push current registers as arguments
-    mov r9, r9
-    mov r8, r8
-    mov rcx, r10
-    mov rdx, rdx
-    mov rsi, rdi
-    mov rdi, rax ; First arg is syscall number
-    
-    ; Wait, the Linux syscall convention is:
-    ; rax: syscall number
-    ; args: rdi, rsi, rdx, r10, r8, r9
-    
-    ; Let's just pass a pointer to the saved registers to the dispatcher
+    ; Set up argument for syscall_dispatcher(struct syscall_regs*)
     mov rdi, rsp
     call syscall_dispatcher
 
@@ -75,8 +57,14 @@ syscall_entry:
     pop rbx
     pop rax
     
-    pop rcx ; restore rip
-    pop r11 ; restore rflags
-
+    ; Restore user state in correct order
+    pop rdi ; Temporarily pop user RSP into RDI
+    pop rcx ; Restore return RIP
+    pop r11 ; Restore RFLAGS
+    
+    mov [gs:8], rdi      ; Store user RSP back in GS for final restore
+    mov rsp, [gs:8]      ; Restore user RSP
+    swapgs
+    
     ; Return to Ring 3 using sysret
     o64 sysret

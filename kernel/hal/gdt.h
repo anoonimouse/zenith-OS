@@ -46,6 +46,11 @@ struct tss_descriptor {
     uint32_t reserved;
 } __attribute__((packed));
 
+struct cpu_context {
+    uint64_t kernel_stack;
+    uint64_t user_stack_temp;
+} __attribute__((packed));
+
 void gdt_init();
 void gdt_set_kernel_stack(uint64_t stack);
 

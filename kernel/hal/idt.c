@@ -53,7 +53,7 @@ void idt_init(void) {
     idt_set_gate(30, isr30, IDT_ATTR_INTERRUPT, 0); idt_set_gate(31, isr31, IDT_ATTR_INTERRUPT, 0);
 
     // Register IRQs
-    idt_set_gate(32, irq0, IDT_ATTR_INTERRUPT, 0); idt_set_gate(33, irq1, IDT_ATTR_INTERRUPT, 0);
+    idt_set_gate(32, irq0, IDT_ATTR_INTERRUPT, 2); idt_set_gate(33, irq1, IDT_ATTR_INTERRUPT, 0);
     idt_set_gate(34, irq2, IDT_ATTR_INTERRUPT, 0); idt_set_gate(35, irq3, IDT_ATTR_INTERRUPT, 0);
     idt_set_gate(36, irq4, IDT_ATTR_INTERRUPT, 0); idt_set_gate(37, irq5, IDT_ATTR_INTERRUPT, 0);
     idt_set_gate(38, irq6, IDT_ATTR_INTERRUPT, 0); idt_set_gate(39, irq7, IDT_ATTR_INTERRUPT, 0);
@@ -61,6 +61,9 @@ void idt_init(void) {
     idt_set_gate(42, irq10, IDT_ATTR_INTERRUPT, 0); idt_set_gate(43, irq11, IDT_ATTR_INTERRUPT, 0);
     idt_set_gate(44, irq12, IDT_ATTR_INTERRUPT, 0); idt_set_gate(45, irq13, IDT_ATTR_INTERRUPT, 0);
     idt_set_gate(46, irq14, IDT_ATTR_INTERRUPT, 0); idt_set_gate(47, irq15, IDT_ATTR_INTERRUPT, 0);
+
+    extern void isr129();
+    idt_set_gate(129, isr129, 0x8E, 2);
 
     serial_printf("IDT: Initialized and loaded at %p\n", &idt);
 }

@@ -53,6 +53,7 @@ ISR_NOERRCODE 28
 ISR_NOERRCODE 29
 ISR_ERRCODE   30
 ISR_NOERRCODE 31
+ISR_NOERRCODE 129
 
 ; IRQs (32-47)
 %macro IRQ 2
@@ -103,6 +104,9 @@ isr_common_stub:
     ; The first argument to interrupt_handler is the stack pointer
     mov rdi, rsp
     call interrupt_handler
+    
+    ; The handler returns the RSP of the task that should be running
+    mov rsp, rax
 
     ; Restore all registers
     pop r15
